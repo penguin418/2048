@@ -1,0 +1,11 @@
+{
+  "name": "Seokjin.Bae",
+  "version": "0.0.1",
+  "description": "2048 implementation",
+  "main": "index.js",
+  "author": "penguin418 <penguin418@naver.com>",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.1"
+  }
+}
