@@ -1,10 +1,34 @@
 const createGame = ((id) => {
-    // 변수
+    // 보드 변수
     const BoardColor = "#b5a99a"
     const tileColor = "#c7baae"
     const colors = ['#e7ddd3']
-    // 입력 대기
-    let waitForInput = false;
+    // 애니메이션 함수
+    function circ(timeFraction) {
+        return 1 - Math.sin(Math.acos(timeFraction));
+    }
+    function animate({ timing, draw, duration, onComplete }) {
+        if (timing === undefined) {
+            timing = circ
+        }
+        let start = performance.now();
+        requestAnimationFrame(function animate(time) {
+            let timeFraction = (time - start) / duration;
+            if (timeFraction > 1) timeFraction = 1;
+            let progress = timing(timeFraction)
+            draw(progress);
+            if (timeFraction < 1) {
+                requestAnimationFrame(animate);
+            } else if (onComplete !== undefined) {
+                onComplete()
+            }
+        });
+    }
+    // 시간 함수
+    function timer(delay) {
+        return new Promise((resolve) => setTimeout(resolve, delay))
+    }
+
 
     // 회전 함수
     function rotateArray(a, n) {
@@ -24,8 +48,6 @@ const createGame = ((id) => {
         }
         return a
     }
-    // 이동 함수
-
 
     const SHIFT_DIRECTION = {
         RIGHT: 'right',
@@ -33,6 +55,34 @@ const createGame = ((id) => {
         LEFT: 'left',
         UP: 'up',
     }
+
+    // 키보드 캡쳐
+    // 입력 대기
+    let waitForInput = false;
+    let shiftDirection = ''
+    document.addEventListener('keydown', function (e) {
+        let x = 0, y = 0;
+        switch (e.key) {
+            case "ArrowLeft":
+                x = -1;
+                shiftDirection = SHIFT_DIRECTION.LEFT
+                break;
+            case "ArrowRight":
+                x = 1;
+                shiftDirection = SHIFT_DIRECTION.RIGHT
+                break;
+            case "ArrowUp":
+                y = -1
+                shiftDirection = SHIFT_DIRECTION.UP
+                break;
+            case "ArrowDown":
+                y = 1
+                shiftDirection = SHIFT_DIRECTION.DOWN
+                break;
+        }
+
+        if (x || y) { waitForInput = false }
+    })
 
 
     // 셀
@@ -57,6 +107,8 @@ const createGame = ((id) => {
         renderOn(parent) {
             this.posX = this.x * (this.size) + this.pd
             this.posY = this.y * (this.size) + this.pd
+            this.lastX = this.x
+            this.lastY = this.y
             this.el.style.cssText = `
             width: ${this.size - this.pd * 2}px;
             height: ${this.size - this.pd * 2}px;
@@ -64,6 +116,9 @@ const createGame = ((id) => {
             position: absolute;
             top:${this.posY}px;
             left:${this.posX}px;
+            display: flex;
+            align-items:center;
+            justify-content: center;
             `
             parent.appendChild(this.el)
             this.update()
@@ -75,6 +130,8 @@ const createGame = ((id) => {
             top:${this.posY}px;
             left:${this.posX}px;
             `
+            this.lastX = this.x
+            this.lastY = this.y
         }
     }
     class NumberTile extends Tile {
@@ -93,17 +150,57 @@ const createGame = ((id) => {
         }
         renderOn(parent) {
             super.renderOn(parent)
+            const startSize = 0
+            const endSize = this.size - this.pd * 2
             this.el.style.cssText += `
+            width: ${startSize}px;
+            height: ${startSize}px;
             background: ${colors[0]};
             `
             parent.appendChild(this.el)
+            animate({
+                draw: (progress) => {
+                    const curSize = startSize + (endSize - startSize) * progress
+                    const curPosX = this.posX + (this.size - this.pd * 2 - curSize) / 2
+                    const curPosY = this.posY + (this.size - this.pd * 2 - curSize) / 2
+
+                    this.el.style.cssText += `
+                        width: ${curSize}px;
+                        height: ${curSize}px;
+                        top:${curPosY}px;
+                        left:${curPosX}px;
+                        `
+                },
+                duration: 100
+            })
         }
         update() {
-            super.update()
-            this.el.innerHTML = this.number
-            if (this.deleteFlag === true) {
-                this.el.remove()
-            }
+            this.srcPosX = this.lastX * (this.size) + this.pd
+            this.srcPosY = this.lastY * (this.size) + this.pd
+            this.destPosX = this.x * (this.size) + this.pd
+            this.destPosY = this.y * (this.size) + this.pd
+            animate({
+                draw: (progress) => {
+                    this.posX = this.srcPosX + (this.destPosX - this.srcPosX) * progress
+                    this.posY = this.srcPosY + (this.destPosY - this.srcPosY) * progress
+                    console.log('update', progress, this.posX, this.posY)
+                    this.el.style.cssText += `
+                        top:${this.posY}px;
+                        left:${this.posX}px;
+                        `
+                    this.el.innerHTML = `${this.number}`
+                },
+                duration: 100,
+                onComplete: () => {
+                    console.log('onComplete', this)
+                    if (this.deleteFlag === true) {
+                        this.el.remove()
+                    }
+                    this.el.innerHTML = `${this.number}`
+                    this.lastX = this.x
+                    this.lastY = this.y
+                }
+            })
         }
     }
     // 보드
@@ -128,16 +225,16 @@ const createGame = ((id) => {
         }
         addNumberedTile(y, x, tile) {
             tile.setPosition(y, x)
-            tile.renderOn(this.getElement())
             const coordinate = tile.getCoordinate()
             this.grid[coordinate.y][coordinate.x] = tile
+            tile.renderOn(this.getElement())
         }
         printGrid() {
             let gridPrinter = ''
             this.grid.forEach(gridLine => {
                 gridPrinter += `${gridLine.map(t => t ? t.getNumber() : 0)}\n`
             })
-            console.log(gridPrinter)
+            return gridPrinter
         }
         updateGrid(newGrid) {
             this.grid = newGrid
@@ -231,7 +328,6 @@ const createGame = ((id) => {
                 case SHIFT_DIRECTION.DOWN: destGrid = rotateArray(destGrid, 3); break;
                 case SHIFT_DIRECTION.LEFT: destGrid = rotateArray(destGrid, 0); break;
             }
-            // this.printGrid()
             this._initialize(this.size)
             destGrid.forEach((destGridRow, destI) => {
                 destGridRow.forEach((tiles, destJ) => {
@@ -245,7 +341,6 @@ const createGame = ((id) => {
                     })
                 })
             })
-
         }
         _initialize(size) {
             this.grid = Array.from({ length: size }, () => Array.from({ length: size }))
@@ -271,32 +366,6 @@ const createGame = ((id) => {
             parent.appendChild(this.el)
         }
     }
-    // 키보드 캡쳐
-    let shiftDirection = ''
-    document.addEventListener('keydown', function (e) {
-        let x = 0, y = 0;
-        switch (e.key) {
-            case "ArrowLeft":
-                x = -1;
-                shiftDirection = SHIFT_DIRECTION.LEFT
-                break;
-            case "ArrowRight":
-                x = 1;
-                shiftDirection = SHIFT_DIRECTION.RIGHT
-                break;
-            case "ArrowUp":
-                y = -1
-                shiftDirection = SHIFT_DIRECTION.UP
-                break;
-            case "ArrowDown":
-                y = 1
-                shiftDirection = SHIFT_DIRECTION.DOWN
-                break;
-        }
-
-        if (x || y) { waitForInput = false }
-    })
-
     // 초기화 - 프레임사이즈 계산
     const rect = document.getElementById(id)
     const rectSize = Math.min(rect.offsetHeight, rect.offsetWidth)
@@ -345,24 +414,13 @@ const createGame = ((id) => {
         board.renderOn(frame)
         const updateTargets = []
         while (playGame) {
+
+            await timer(200)
             const emptyTilePos = board.getEmptyTiles(1).at(0)
-            console.log('emptyTilePos', emptyTilePos)
             const numberTile = new NumberTile(board.getTileSize(), 2)
             board.addNumberedTile(emptyTilePos.y, emptyTilePos.x, numberTile)
+            console.log('grid', board.printGrid())
             updateTargets.push(numberTile)
-
-
-
-            board.printGrid()
-            // let gridPrinter = ''
-            // const newArray = rotateArray(board.grid, 1)
-            // // 위로 이동시 1번, 오른쪽 이동시 2번, 아래 이동시 3번돌면
-            // // 현재위치에서 이동한 경우의 위치가 나옴
-            // newArray.forEach(gridLine => {
-            //     gridPrinter += `${gridLine.map(t => t ? t.getNumber() : 0)}\n`
-            // })
-            // console.log('rotated\n', gridPrinter)
-
             waitForInput = true;
             await new Promise((resolve) => {
                 const waitId = setInterval(() => {
