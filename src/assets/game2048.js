@@ -17,6 +17,7 @@ const createGame = ((id) => {
         return pallete[number] || '#edcc62'
     }
     const primaryColor = colors(0)
+
     // 애니메이션 함수
     function circ(timeFraction) {
         return 1 - Math.sin(Math.acos(timeFraction));
@@ -38,7 +39,7 @@ const createGame = ((id) => {
             }
         });
     }
-    // 회전 함수
+    // 도움 함수
     function rotateArray(a, n) {
         function __rotateRight(a) {
             const rowSize = a.length;
@@ -310,7 +311,7 @@ const createGame = ((id) => {
         }
         shiftable() {
             // 남은 타일 존재
-            console.log('this.getEmptyTiles().length', this.getEmptyTiles().length)
+            // console.log('this.getEmptyTiles().length', this.getEmptyTiles().length)
             if (this.getEmptyTiles(1).length > 0) {
                 return true;
             }
@@ -339,7 +340,7 @@ const createGame = ((id) => {
          * @return {Boolean} 이동 여부
          */
         shift(shiftDirection) {
-            console.log('original-1\n', this.printGrid())
+            // console.log('original-1\n', this.printGrid())
             switch (shiftDirection) {
                 case SHIFT_DIRECTION.UP: this.grid = rotateArray(this.grid, 3); break;
                 case SHIFT_DIRECTION.RIGHT: this.grid = rotateArray(this.grid, 2); break;
@@ -486,7 +487,7 @@ const createGame = ((id) => {
             this.score = 0;
         }
         updateScore(newScore) {
-            console.log('newScore', newScore)
+            // console.log('newScore', newScore)
             this.score = this.score + newScore;
             this.scoreEl.innerHTML = `
             score<br>
